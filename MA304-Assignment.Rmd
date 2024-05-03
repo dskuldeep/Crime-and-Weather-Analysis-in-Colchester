@@ -1,0 +1,977 @@
+---
+title: "MA304 - Understanding the factors affecting crime in Colchester with the Policing and Weather data of 2023"
+author: "Kuldeep Paul (2322439)"
+date: "2024-04-17"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include=TRUE)
+library(knitr)
+```
+
+```{r include=FALSE}
+# Package Installation
+if (!require("cowplot")) {
+  install.packages("cowplot")
+}
+
+if (!require("plotly")) {
+  install.packages("plotly")
+}
+library(plotly)
+
+if (!require("dplyr")) {
+  install.packages("dplyr")
+}
+
+if (!require("ggplot2")) {
+  install.packages("ggplot2")
+}
+
+if (!require("osmdata")) {
+  install.packages("osmdata")
+}
+
+if (!require("leaflet")) {
+  install.packages("leaflet")
+}
+
+if (!require("sf")) {
+  install.packages("sf")
+}
+
+if (!require("leaflet.extras")) {
+  install.packages("leaflet.extras")
+}
+
+if (!require("reshape2")) {
+  install.packages("reshape2")
+}
+
+if (!require("lubridate")) {
+  install.packages("lubridate")
+}
+```
+
+# Introduction
+
+Studying crime data is crucial for comprehending patterns, trends, and possible interventions in ensuring public safety and security. In this study, we will analyze the policing data from Colchester in 2023, along with weather information, with the goal of revealing insights and creating engaging visualizations of the data.
+The dataset on policing in Colchester provides a wealth of information on different aspects of crime incidents, such as categories, locations, and results. By examining this data set, we can acquire important knowledge about crime trends in the area, the various factors impacting crime rates, and possible approaches to preventing and enforcing laws.
+
+Furthermore, we include weather information in our study to investigate the relationship and connection between weather patterns and criminal activity in Colchester. Understanding the potential influence of weather patterns on crime rates can offer valuable information for law enforcement agencies and urban planners when creating successful approaches for preventing and addressing crime.
+
+Our main goal is to conduct a thorough analysis of the policing dataset from Colchester in 2023, incorporating weather data through data visualization. Our goal is to investigate where and when crime incidents occur, uncover patterns, trends, and relationships in the data, demonstrate unique ways to visualize and present the information, and suggest future analysis and actions based on our discoveries.
+
+The report is designed to lead readers through our analysis procedure, beginning with data preparation and basic visualizations for each dataset, moving on to advanced visualizations and interpretation of the results. 
+
+By combining statistical analysis, data visualization methods, and narrative storytelling, the goal of this project is to provide a detailed insight into the patterns of crime in Colchester and investigate how weather conditions impact crime rates. Let's start this adventure of exploring and discovering using data visualization as our guide.
+
+# Data Preparation
+
+In this section, we will describe the process of loading and preprocessing the policing dataset from Colchester in 2023, as well as the weather dataset. Proper data preparation is crucial for ensuring the accuracy and reliability of our analysis.
+
+## Loading the Datasets
+
+We will start by loading the policing dataset and the weather dataset into our R environment. The policing dataset contains information about crime incidents, including categories, locations, dates, and outcomes. The weather dataset provides information about weather conditions such as temperature, precipitation, and wind speed.
+
+```{r}
+temp_data <- read.csv('temp2023.csv')
+crime_data <- read.csv('crime23.csv')
+str(temp_data)
+str(crime_data)
+```
+
+## Understanding the datasets:
+
+- The weather dataset contains 365 observations of 18 variables. These variables include station_ID, Date, TemperatureCAvg, TemperatureCMax, TemperatureCMin, TdAvgC, HrAvg, WindkmhDir, WindkmhInt, WindkmhGust, PresslevHp, Precmm, TotClOct, lowClOct, SunD1h, VisKm, PreselevHp, and SnowDepcm.
+
+- The policing dataset contains 6878 observations of 12 variables. These variables include category, persistent_id, date, lat, long, street_id, street_name, context, id, location_type, location_subtype, and outcome_status.
+
+### The Meaning of the variables in the Weather Dataset is given below:
+
+- station_ID - WMO station identifier
+- Date - date (and time) of observations
+- TC - air temperature at 2 metres above ground level. Values given in Celsius degrees
+- Viskm - visibility in kilometres
+- Snowcm - depth of snow cover in centimetres
+- TemperatureCAvg - average air temperature at 2 metres above ground level. Values given in Celsius degrees
+- TemperatureCMax - maximum air temperature at 2 metres above ground level. Values given in Celsius degrees
+- TemperatureCMin - minimum air temperature at 2 metres above ground level. Values given in Celsius degrees
+- TdAvgC - average dew point temperature at 2 metres above ground level. Values given in Celsius degrees
+- HrAvg - average relative humidity. Values given in %
+- WindkmhDir - wind direction
+- WindkmhInt - wind speed in km/h
+- WindkmhGust - wind gust in km/h
+- PresslevHp - Sea level pressure in hPa
+- Precmm - precipitation totals in mm
+- TotClOct - total cloudiness in octants
+- lowClOct - cloudiness by low level clouds in octants
+- SunD1h - sunshine duration in hours
+- PreselevHp - atmospheric pressure measured at altitude of station in hPa
+- SnowDepcm - depth of snow cover in centimetres
+
+### The description of the policing dataset variables is given below:
+
+- category - Category of the crime (https://data.police.uk/docs/method/crime-street/)
+- persistent_id - 64-character unique identifier for that crime. (This is different to the existing 'id' attribute, which is not guaranteed to always stay the same for each crime.)
+- date - Date of the crime YYYY-MM
+- latitude - Latitude
+- longitude - Longitude
+- street_id - Unique identifier for the street
+- street_name - Name of the location. This is only an approximation of where the crime happened
+- context - Extra information about the crime (if applicable)
+- id: ID of the crime. This ID only relates to the API, it is NOT a police identifier
+- location_type - The type of the location. Either Force or BTP: Force indicates a normal police force location; BTP indicates a British Transport Police location. BTP locations fall within normal police force boundaries.
+- location_subtype - For BTP locations, the type of location at which this crime was recorded.
+- outcome_status - The category and date of the latest recorded outcome for the crime
+
+
+
+
+
+## Data Cleaning and Data Types
+
+In the first step of the Data Preparation, we need to check if the data sets have any missing values and whether there are any columns which have incomplete or inconsequential data.
+
+```{r}
+crime_data[crime_data == ""] <- NA
+temp_data[temp_data == ""] <- NA
+
+crime_missing <- is.na(crime_data)
+temp_missing <- is.na(temp_data)
+counts_crime_missing <- colSums(crime_missing)
+counts_temp_missing <- colSums(temp_missing)
+
+crime_na_counts_df <- data.frame(t(counts_crime_missing))
+temp_na_counts_df <- data.frame(t(counts_temp_missing))
+#Removing the columns with value == 0 from both the summary tables
+zero_cols <- colSums(crime_na_counts_df == 0, na.rm = TRUE) == nrow(crime_na_counts_df)
+crime_na_counts_df <- crime_na_counts_df[, !zero_cols]
+
+zero_cols <- colSums(temp_na_counts_df == 0, na.rm = TRUE) == nrow(temp_na_counts_df)
+temp_na_counts_df <- temp_na_counts_df[, !zero_cols]
+
+kable(crime_na_counts_df, caption = "Crime Dataset Missing Values")
+kable(temp_na_counts_df, caption = "Weather Dataset Missing Values")
+```
+
+Hence, from this table we can see that both the data sets have some missing values and we need to handle these missing values so that they do not interfere in the further processing of the data.
+
+### Handling the Missing and Irrelevant Values in the Crime Dataset
+
+From the Missing Value Summary table we can make the following observations:
+
+- The "context" variable has 6878 missing values i.e. it is an empty column in the dataset and hence we can remove the entire column from the data.
+- The "location_subtype" variable has 6854 missing values  i.e. this column is also largely empty and hence can be dropped from the data set.
+- The "persistent_id" variable also has 701 missing values  and from the data set description at https://ukpolice.njtierney.com/reference/ukp_crime.html we can understand that this is a identifier for the crime. 
+- We also have another variable "id" which acts as the identifier for the API from which the data is fetched, we can drop both these variables (persistent_id and id) from the dataset.
+- The "outcome_status" variable has 677 missing values, however, since this is the column recording the status of a crime, we can treat this variable as a qualitative variable and can treat NA as a factor for the variable, for this we should replace "NA" with "No Outcome" and treat it accordingly in our analysis.
+
+```{r}
+library(dplyr)
+crime_data <- crime_data %>%
+  select(-context, -location_subtype) %>%
+  select(-persistent_id, -id)
+
+crime_data$outcome_status[is.na(crime_data$outcome_status)] <- "No Outcome"
+
+sum(is.na(crime_data))
+str(crime_data)
+```
+
+### Handling the Missing and Irrelevant Values in the Weather Dataset
+
+From the Missing Value Summary table we can make the following observations:
+
+- The variable "Precmm" denoting the total precipitation on that day has 27 missing values, assuming missing values indicate that there was no precipitation we can replace the missing values with 0
+- The variable "lowClOct" denoting cloudiness by low level clouds in octants has 13 missing values, assuming missing values indicate that there was no cloudiness we can replace the missing values with 0
+- The variable "SunD1h" denoting sunshine duration in hours has 82 missing values, assuming missing values indicate that there was no sunshine duration we can replace the missing values with 0
+- The variable "PreselevHp"denoting atmospheric pressure measured at altitude of station in hPa has 365 missing values, since this is an empty column we can remove the column from our data set
+- The variable "SnowDepcm" denoting depth of snow cover in centimetres has 364 missing values, since this column has only one entry we can remove the column from our data set.
+
+```{r}
+temp_data <- temp_data %>%
+  select(-PreselevHp, -SnowDepcm)
+
+temp_data$Precmm[is.na(temp_data$Precmm)] <- 0
+temp_data$lowClOct[is.na(temp_data$lowClOct)] <- 0
+temp_data$SunD1h[is.na(temp_data$SunD1h)] <- 0
+
+```
+
+Now that we have cleaned both the datasets, it is essential we work on the data types of the data sets.
+
+In the weather data, we need to convert the dates in the weather dataset from type character to type date:
+```{r}
+temp_data$Date <- as.Date(temp_data$Date)
+```
+
+Next, we need to look at the weather data and identify the qualitative variables in the dataset and convert them into factors.
+In the given dataset, the WindkmhDir variable is a qualitative variable, rest of the variables are numeric variables, so converting it from type character to factor
+
+```{r}
+temp_data$WindkmhDir <- factor(temp_data$WindkmhDir)
+str(temp_data)
+```
+In the crime data we have the following qualitative variables:
+- category
+- street_id
+- street_name
+- location_type
+- outcome_status
+
+So, we are converting all of these into factors:
+```{r}
+crime_data$category <- factor(crime_data$category)
+crime_data$street_id <- factor(crime_data$street_id)
+crime_data$street_name <- factor(crime_data$street_name)
+crime_data$location_type <- factor(crime_data$location_type)
+crime_data$outcome_status <- factor(crime_data$outcome_status)
+str(crime_data)
+```
+This concludes our Data Preparation stage, we have succesfully cleaned the data set by handling the missing values and also removing unnecessary columns from the data which had less or no data and relevance. We have also converted the qualitative variables into factors as this will help in out further analysis.
+
+# Data Exploration
+
+In the crime23 dataset, we have a total of 6878 observations with 8 variables post cleaning. If we look at the dataset, we can observe that the entries in the data are tagged with the month in which the crime occurred, so the quantum of time we can use to observe temporal changes in the data is "monthly".
+
+## Temporal Analysis of Crime Data
+
+To start our exploration of the crime data we can take a look at the temporal changes in the data, in other words we can take a look at how the crimes happened on a monthly basis. In order to do this, we can start by plotting the count of the total crimes that happened in a month in the year 2023. Plotting the same as a bar plot to understand the total crimes by month.
+```{r fig.width=10}
+
+crime_df <- crime_data
+temp_df <- temp_data
+
+# Extract the month from the date strings
+crime_data$month <- substr(crime_data$date, 6, 7)
+
+# Count the number of crimes per month for the year 2023
+crime_count <- table(crime_data$month)
+
+# Plot the count of total crimes by month as a bar plot
+barplot(crime_count, 
+        main = "Total Crimes by Month in 2023",
+        xlab = "Month",
+        ylab = "Total Crimes",
+        col = "skyblue",
+        ylim = c(0, max(crime_count) + 100),
+        names.arg = month.abb)
+```
+
+Next, we can look at the crime categories and their occurences by month, we can visualise this by the help of a stacked barplot and try to understand how the category of the crime vary by month.
+
+```{r}
+crime_data$month <- factor(crime_data$month)
+months <- levels(crime_data$month)
+
+crime_table <- table(crime_data$category, crime_data$month)
+
+kable(crime_table, caption = "Crime Count by Month")
+```
+
+```{r fig.width=10}
+library(ggplot2)
+# Create a data frame from the provided table
+crime_data_plot <- data.frame(
+  crime = rep(row.names(crime_table), times = ncol(crime_table)),
+  month = rep(colnames(crime_table), each = nrow(crime_table)),
+  count = as.vector(crime_table)
+)
+
+custom_colors <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "skyblue")
+
+# Plot stacked bar chart
+ggplot(crime_data_plot, aes(x = month, y = count, fill = crime)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = custom_colors) +
+  labs(title = "Stacked Bar Plot of Crime Types Over Months",
+       x = "Month",
+       y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+From the above plot we can observe that in the month of January there is a peak in the total count of crimes committed and there is a minima in the month of february. We can also observe that in all the months the highest count of crimes committed are of the category "violent-crime"and the lowest counts are that of "theft-from-the-person", "robbery" and "possession-of-weapons".
+
+### Insights from temporal analysis of crime data
+
+- We can see a variation in the count of total crimes committed over time with its peak in January and its minimum in February.
+- It can also be observed that certain types of crimes are prevalent in all the months and have a uniformly high number of cases all through the year, for example violent crimes.
+- We can also observe that the relative distribution of crimes in a category is relatively uniform through out the year.
+
+## Analysis of Crime by Category and Outcome
+
+We should look at the count of the crimes committed by category. We can use a pie chart to visualise this data.
+
+```{r fig.width=10}
+crime_2 <- rowSums(crime_table)
+crime_3 <- data.frame(crime_2) 
+colnames(crime_3) <- "Count"
+kable(crime_3, caption="Crimes by Category")
+
+# Create a data frame from the provided table
+crime_data <- data.frame(
+  crime = names(crime_2),
+  count = as.vector(crime_2)
+)
+
+total <- sum(crime_data$count)
+crime_data$percentage <- crime_data$count/total *100
+
+# Plot pie chart
+ggplot(crime_data, aes(x = "", y = count, fill = crime)) +
+  geom_bar(stat = "identity", width = 2) +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = custom_colors) +
+  labs(title = "Pie Chart of Crime Types",
+       fill = "Crime Type") +
+  theme_void() +
+  theme(legend.position = "right", legend.box.margin = margin(1, 1, 1, 1, "cm")) +
+  geom_text(aes(x = 2.25, label=paste0(round(percentage, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            size=4)
+```
+From this plot we can observe that in the year 2023, the most occuring crime is "violent-crime" (38.3%) and the least occurring types of crimes are "theft-from-the-person" (1.1%), "robbery" (1.4%) and "possession-of-weapons"(1.1%) and "other-crime" (1.3%).
+
+Now that we have an understanding of the count of the crime categories, we can try to understand whether there is a ascertainable pattern in the outcome_status with the crime category.
+
+Based on the outcome of the crime, we can visualise the most common type of outcome in the crimes committed in Colchester.
+```{r fig.width=10}
+crime_data <- crime_df
+library(plotly)
+
+# Create a table of outcome_status
+outcome_status_table <- table(crime_data$outcome_status)
+
+# Convert the table to a data frame
+outcome_status_data <- data.frame(outcome_status = names(outcome_status_table),
+                                  count = as.vector(outcome_status_table))
+
+# Create the pie chart
+pie_chart <- plot_ly(outcome_status_data, labels = ~outcome_status, values = ~count, type = "pie") %>%
+  layout(title = "Pie Chart of Crime Outcome Status")
+
+# Print the pie chart
+ggplotly(pie_chart)
+```
+
+From this plot, we can see that a majority of the crimes commited are of the following outcomes:
+- Investigation Complete, no suspect identified
+- Unable to prosecute suspect
+- No outcome
+
+These constitute almost **77% of the reported crimes** in Colchester and should be looked into by the law-enforcement officials.
+
+In order to understand how crime outcome varies with the different crime categories we need to plot the count of each crime category for each outcome_status.
+
+```{r fig.width=10, fig.height=7}
+crime_data <- crime_df
+outcome <- levels(crime_data$outcome_status)
+outcome_table <- table(crime_data$category, crime_data$outcome_status)
+#kable(outcome_table, caption = "Outcome by Crimes")
+
+# Create a data frame from the provided table
+outcome_data_plot <- data.frame(
+  crime = rep(row.names(outcome_table), times = ncol(outcome_table)),
+  outcome = rep(colnames(outcome_table), each = nrow(outcome_table)),
+  count = as.vector(outcome_table)
+)
+
+library(plotly)
+
+# Convert crime column to factor
+outcome_data_plot$crime <- as.factor(outcome_data_plot$crime)
+
+# Plot the stacked bar chart
+plot <- ggplot(outcome_data_plot, aes(x = outcome, y = count, fill = crime)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Stacked Bar Plot of Crime Types Over Outcomes",
+       x = "Outcome",
+       y = "Count") +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+
+# Convert ggplot object to plotly
+plotly_plot <- ggplotly(plot)
+
+# Print the interactive plot
+ggplotly(plotly_plot)
+
+```
+From this plot we can see that all the NA values that we re-labelled as (No Outcome) are of the crime category "anti-social-behaviour". We can also observe that the outcome of a majority of the crimes reported are "Investigation completed, no suspect identified" and "Unable to prosecute suspect". Alse we can see that a majority of the crimes that are currently under observation are of the category of violent-crime.
+
+### Insights from analysing crime by category and outcome:
+
+- Certain types of crimes like violent crimes have predominantly high cases and law-enforcement should put in effort in targeting the prevention and resolution of such crimes.
+- We can also observe that a majority (77%) of the cases are unresolved (Unable to prosecute suspect/No Outcome/No suspect Identified).
+- When we analysed the types of crimes with the unresolved outcomes, we could find that a significant part of them are violent crime, shoplifting, vehicle crime, theft, arson and weapons related. With more focus on systematic prevention of such crimes, law-enforcement could severely help in satisfactory resolution of these reported crimes.
+
+## Analysis of Crime Distribution by Streets and Geography
+
+### Geospatial Analysis of Crime by Category 
+
+We can visulise how different crime categories are happening geographically by plotting them on a map and colour coding the locations where the crime happened based on the category of the crime.
+
+```{r fig.width=10}
+library(osmdata)
+library(leaflet)
+library(sf)
+library(leaflet.extras)
+
+# Convert category to factor
+crime_df$category <- factor(crime_df$category)
+
+# Define a color palette for the categories
+category_palette <- colorFactor(palette = "Set1", domain = levels(crime_df$category))
+
+# Create a leaflet map
+map <- leaflet() %>%
+  addTiles() %>%
+  setView(lng = mean(crime_df$long), lat = mean(crime_df$lat), zoom = 14)
+
+# Add clustered markers, color by category
+map <- map %>%
+  addCircleMarkers(data = crime_df, 
+                   lng = ~long, lat = ~lat,
+                   color = ~category_palette(category),
+                   fillOpacity = 0.7,  # Adjust transparency
+                   stroke = FALSE,     # Remove marker borders
+                   radius = 5,         # Adjust marker size
+                   popup = ~paste("Latitude:", lat, "<br>Longitude:", long))
+
+# Get unique categories and their corresponding colors
+unique_categories <- levels(crime_df$category)
+category_colors <- category_palette(unique_categories)
+
+# Create legend
+legend <- addLegend(map = map, position = "bottomright", colors = category_colors, 
+                    labels = unique_categories, title = "Crime Category")
+
+# Display the map with legend
+legend
+
+```
+
+
+We can also take a look at the crime distribution by street_id to understand the crime distribution in Colchester as per the dataset. We can use a density plot to visualise this:
+```{r fig.width=10}
+
+crime_data <- data.frame(
+  street_id = levels(crime_df$street_id),
+  crime_count = as.numeric(table(crime_df$street_id))
+)
+
+# Plot density plot
+ggplot(crime_data, aes(x = crime_count)) +
+  geom_density(fill = "skyblue", color = "blue") +
+  labs(title = "Density Plot of Crime Count by Street ID",
+       x = "Crime Count",
+       y = "Density") +
+  theme_minimal()
+
+density_values <- density(crime_data$crime_count)$y
+# Find the maximum density value (peak) and corresponding crime count
+max_density <- max(density_values)  # Replace 'density_values' with the density values from your plot
+peak_crime_count <- crime_data$crime_count[which.max(density_values)]
+
+peak_crime_count
+max_density
+max(crime_data$crime_count)
+median(crime_data$crime_count)
+
+```
+From this plot we can make the following observations:
+
+- Left-Skewed Curve: The left-skewed curve indicates that the majority of street IDs have lower crime counts, with a long tail extending towards higher crime counts. This suggests that most street IDs experience relatively fewer crimes, but there are a few street IDs with higher crime counts that contribute to the longer tail on the right side of the plot.
+- Sharp Peak at Crime Count 7: The sharp peak at crime count 7 suggests that there is a significant concentration of street IDs with a crime count of 7. This peak represents a mode or cluster in the distribution of crime counts, indicating that a notable number of street IDs have reported exactly 7 crimes.
+- Peak Density of 0.04: The peak density of 0.04 indicates the maximum likelihood of observing a crime count, which occurs at the peak of the distribution (crime count 7). This peak density value represents the highest probability density in the dataset.
+- Extension Far to the Right: The extension of the curve far to the right suggests that there are some street IDs with exceptionally high crime counts compared to the majority of street IDs. These street IDs contribute to the long tail of the distribution, indicating a few outliers or extreme values in the dataset.
+- Small Humps at Crime Counts 150 and 120: The presence of small humps or peaks at crime counts 150 and 120, with peak densities of 0.001, suggests additional clusters or modes in the distribution. These humps indicate that there are street IDs with relatively higher crime counts compared to the majority but are not as common as the peak at crime count 7.
+- The maximum count of crime by street id is 241. This shows that there is a street with 241 reported crimes which is very high in comparison to the median value of 9 crimes in most of the streets. This could be due to high amount of crimes occurring in a particular part of the town.
+
+In order to further investigate the outliers with high amount of crime reported in the data, we can use a box-plot and filter out the street-ids that have exceptionally high crime count.
+```{r fig.width=10}
+# Calculate quartiles and interquartile range
+Q1 <- quantile(crime_data$crime_count, 0.25)
+Q3 <- quantile(crime_data$crime_count, 0.75)
+IQR <- Q3 - Q1
+
+# Define upper and lower bounds for outliers
+upper_bound <- Q3 + 1.5 * IQR
+
+# Filter street IDs with exceptionally high crime counts
+outliers <- crime_data$street_id[crime_data$crime_count > upper_bound]
+
+# Filter crime_data to exclude outliers
+non_outlier_counts <- crime_data[!crime_data$street_id %in% outliers, ]
+
+par(mfrow = c(1, 2))
+# Create box plot without ggplot
+boxplot(non_outlier_counts$crime_count, 
+        main = "Box Plot (without Outliers)",
+        ylab = "Crime Count",
+        col = "skyblue",
+        border = "blue",
+        boxwex = 0.5, 
+        outline = TRUE)
+
+boxplot(crime_data$crime_count, 
+        main = "Box Plot (with Outliers)",
+        ylab = "Crime Count",
+        col = "red",
+        border = "blue",
+        boxwex = 0.5,  # Adjust the width of the box
+        outline = TRUE)
+```
+Lets take a look at the street_ids with outliers:
+```{r}
+outliers
+len_out <- length(outliers)
+outlier_counts <- crime_data[crime_data$street_id %in% outliers, ]
+outlier_crimes <- sum(outlier_counts$crime_count)
+totalcrimes <- nrow(crime_df)
+crime_p <- outlier_crimes/totalcrimes * 100
+crime_p
+
+len_street <- length(levels(crime_df$street_id))
+street_p <- len_out/len_street *100
+
+street_p
+```
+From the above analysis we can clearly see that 40% of the reported crimes take place in these 31 street_ids (8.27% of the total street ids). This shows that the crime in colchester is highly concentrated on a few streets while majority of the streets have very low count of crime.
+
+Now lets take a look at the category of crimes being committed in these 31 street_ids:
+
+```{r fig.width=10}
+outlier_df <- crime_df[crime_df$street_id %in% outliers, ]
+
+crime_count <- table(outlier_df$category)
+tbl1 <- crime_count
+tbl2 <- crime_2
+merged_df <- cbind(tbl1, tbl2)
+colnames(merged_df) <- c("outlier", "total")
+#print(merged_df)
+
+comparison_df <- data.frame(merged_df)
+perc_df <- data.frame(comparison_df$outlier/comparison_df$total *100)
+row.names(perc_df) <- row.names(comparison_df)
+colnames(perc_df) <- c("Percentage of crimes in outlier streets")
+kable(perc_df, caption = "Percentages of crime categories in the outlier streets")
+
+```
+
+From the above table we can observe that a significant percentage of certain crimes are committed in these 31 outlier street_ids in Colchester.
+Significant percentage of each crime category occuring in these street_ids:
+
+- 83.4% shoplifting related cases
+- 45.2% drug related cases 
+- 64.5% theft-from-the-person related cases
+- 55.7% bicycle theft related cases
+- 34.7% violent crime related cases
+- 41.5% antisocial behavior related cases
+- 39.2% possession of weapons related cases
+- 44.2% public order related cases
+
+Now that we have established that these certain street_ids have a significantly high amount of crime in almost all types of crime recorded, lets visualise the crime reported from these locations on a map with respect to crime reported from other locations and we can see how these locations are distributed geographically.
+
+```{r fig.width=10}
+library(osmdata)
+library(leaflet)
+library(sf)
+library(leaflet.extras)
+
+non_outlier_df <- crime_df[!crime_df$street_id %in% outliers, ]
+
+crime_sf <- st_as_sf(non_outlier_df, coords = c("long", "lat"), crs = 4326)
+
+# Create a leaflet map
+map <- leaflet() %>%
+  addTiles() %>%
+  setView(lng = mean(non_outlier_df$long), lat = mean(non_outlier_df$lat), zoom = 14)
+
+# Add clustered markers
+map <- map %>%
+  addCircleMarkers(data = outlier_df, 
+                   lng = ~long, lat = ~lat,
+                   color = "red",
+                   radius = 5,
+                   popup = ~paste("Latitude:", lat, "<br>Longitude:", long))
+
+# Add heatmap layer
+map <- map %>%
+  addHeatmap(data = crime_sf, radius = 6)
+
+# Display the map
+map
+
+
+```
+
+40% of the Reported Crime in 2023 happened in the locations marked with the red dots and the rest 60% crimes happened in the blue patches marked on the map. This clearly shows that the crimes have occurred in clusters in the city, the biggest cluster being near the High Street in Colchester. The findings from this analysis could be interesting to law enforcement and could help them reduce overall crime significantly by focussing on these regions of interest.
+
+### Insights from geospatial analysis:
+
+- We analysed the geospatial spread of the crimes in Colchester and were able to identify certain localities with significant concentration of crime
+- We also observed that these localities contribute to a significant chunk of the serious crimes reported in the city
+- Our analysis also shows the geospatial spread of the crimes by category on the map and there was no ascertainable pattern to the spread of the crime category by geography
+- With more focussed approach to dealing with crimes in the clustered localities identified in our analysis, massive reduction in annual crime numbers could be achieved.
+
+## Correlation and Temporal Analysis of Weather Data
+
+In the Weather data set we have the following variables:
+```{r}
+str(temp_data)
+```
+As a lot of the variables in the weather data is numeric data, we should start with a correlation matrix to understand how the data points influence each other and if there is any significant correlation in between them.
+
+```{r fig.width=10}
+library(reshape2)
+
+# Calculate the correlation matrix
+correlation_matrix <- cor(temp_data[, c("TemperatureCAvg", "TemperatureCMax", "TemperatureCMin", 
+                                      "TdAvgC", "HrAvg", "WindkmhInt", "WindkmhGust", 
+                                      "PresslevHp", "Precmm", "TotClOct", "lowClOct", 
+                                      "SunD1h", "VisKm")])
+
+# Melt the correlation matrix for plotting
+melted_correlation <- melt(correlation_matrix)
+
+# Plot correlation heatmap
+ggplot(melted_correlation, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#1a9641", mid = "white", high = "#d7191c", 
+                       midpoint = 0, limits = c(-1, 1), name = "Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Correlation Heatmap of Numeric Variables",
+       x = "Variables",
+       y = "Variables")
+
+```
+From the above matrix we can see that there is strong correlation between certain groups of variables, lets plot the TemperatureCAvg, TemperatureCMax, TemperatureCMin, TdAvgC as a timeseries plot to understand how the variables vary with time.
+
+```{r fig.width=10}
+library(cowplot)
+
+plot1 <- ggplot(temp_data, aes(x=Date, y = TemperatureCAvg, color = TemperatureCAvg))+
+         geom_line() +
+         geom_hline(yintercept = mean(temp_data$TemperatureCAvg, na.rm = TRUE),
+                    color = "blue", linetype = "dashed", size = 1 ) +  # Add mean line
+  geom_smooth(method = "loess", color = "red", size = 1) +  # Add smooth line
+  labs(title = "Average Temperature Over Time",
+       x = "Date",
+       y = "Average Temperature",
+       color = "Temperature") +
+  theme_minimal()
+
+plot2 <- ggplot(temp_data, aes(x=Date, y = TemperatureCMax, color = TemperatureCMax))+
+         geom_line() +
+         geom_hline(yintercept = mean(temp_data$TemperatureCMax, na.rm = TRUE),
+                    color = "blue", linetype = "dashed", size = 1 ) +  # Add mean line
+  geom_smooth(method = "loess", color = "red", size = 1) +  # Add smooth line
+  labs(title = "Max Temperature Over Time",
+       x = "Date",
+       y = "Max Temperature",
+       color = "Temperature") +
+  theme_minimal()
+
+plot3 <- ggplot(temp_data, aes(x=Date, y = TemperatureCMin, color = TemperatureCMin))+
+         geom_line() +
+         geom_hline(yintercept = mean(temp_data$TemperatureCMin, na.rm = TRUE),
+                    color = "blue", linetype = "dashed", size = 1 ) +  # Add mean line
+  geom_smooth(method = "loess", color = "red", size = 1) +  # Add smooth line
+  labs(title = "Min Temperature Over Time",
+       x = "Date",
+       y = "Min Temperature",
+       color = "Temperature") +
+  theme_minimal()
+
+plot4 <- ggplot(temp_data, aes(x=Date, y = TdAvgC, color = TdAvgC))+
+         geom_line() +
+         geom_hline(yintercept = mean(temp_data$TdAvgC, na.rm = TRUE),
+                    color = "blue", linetype = "dashed", size = 1 ) +  # Add mean line
+  geom_smooth(method = "loess", color = "red", size = 1) +  # Add smooth line
+  labs(title = "Average Dew Point Over Time",
+       x = "Date",
+       y = "Avg Dew Point",
+       color = "Temperature") +
+  theme_minimal()
+
+combined_plot <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+
+combined_plot
+# Plot time series for TemperatureCAvg, TemperatureCMax, TemperatureCMin, and TdAvgC
+ggplot(temp_data, aes(x = Date)) +
+  geom_line(aes(y = TemperatureCAvg, color = "TemperatureCAvg"), size = 1) +
+  geom_line(aes(y = TemperatureCMax, color = "TemperatureCMax"), size = 1) +
+  geom_line(aes(y = TemperatureCMin, color = "TemperatureCMin"), size = 1) +
+  geom_line(aes(y = TdAvgC, color = "TdAvgC"), size = 1) +
+  scale_color_manual(values = c("TemperatureCAvg" = "blue", 
+                                 "TemperatureCMax" = "red", 
+                                 "TemperatureCMin" = "green", 
+                                 "TdAvgC" = "orange")) +
+  labs(title = "Time Series Plot of Temperature Variables",
+       x = "Date",
+       y = "Temperature (°C)",
+       color = "Variable") +
+  theme_minimal()
+
+```
+From the above plot we can clearly see that all of the above variables follow a similar pattern and their peaks and troughs are largely overlapping. This conclusion can also be arrived at intuitively. But something notable is the relationship between the Average Dew Point (TdAvgC) and the Average Temperature. 
+
+We can also look at the time series variation of the precipitation variable over time:
+```{r fig.width=10}
+ggplot(temp_data, aes(x=Date, y = Precmm, color = Precmm))+
+         geom_line() +
+         geom_hline(yintercept = mean(temp_data$Precmm, na.rm = TRUE),
+                    color = "seagreen", linetype = "dashed", size = 1 ) +  # Add mean line
+  geom_smooth(method = "loess", color = "red", size = 1) +  # Add smooth line
+  labs(title = "Precipitation Over Time",
+       x = "Date",
+       y = "Precipitation",
+       color = "Temperature") +
+  theme_minimal()
+```
+
+Lets visualise scatter plots between all the numeric variables in the weather dataset:
+
+```{r fig.width=12, fig.height=12}
+# Load required library
+library(ggplot2)
+
+temp_x_data <- temp_data[, !(names(temp_data) %in% c("station_ID", "TotClOct", "TemperatureCMax", "TemperatureCMin", "WindkmhDir", "WindkmhInt", "WindkmhGust", "PreselevHp"))]
+pairs(temp_x_data, pch = ".")
+```
+
+Analysing the relationship between Average Temperature and Average Dew Point using a scatter plot and then fitting a linear regression model between them using the smoothing function:
+```{r fig.width=10}
+library(ggplot2)
+library(plotly)
+
+# Create the ggplot scatter plot with linear regression line
+scatter_plot <- ggplot(temp_data, aes(x = TemperatureCAvg, y = TdAvgC)) +
+  geom_point(color = "red") +
+  geom_smooth(method = "lm", se = TRUE) +  # Add linear regression line without confidence interval
+  labs(title = "Scatter Plot: Average Temperature vs. Average Dew Point with Linear Regression",
+       x = "Average Temperature (°C)",
+       y = "Average Dew Point (°C)") +
+  theme_minimal()
+
+# Convert ggplot to interactive plotly plot
+interactive_plot <- ggplotly(scatter_plot)
+
+# Print the interactive plot
+ggplotly(interactive_plot)
+
+```
+
+The scatter plot and linear regression line demonstrate a positive correlation between average temperature and average dew point, indicating that as temperature increases, so does dew point, reflecting higher moisture levels in warmer conditions. The close clustering of data points around the regression line suggests a strong correlation between temperature and dew point changes, supporting the suitability of the linear model within the observed data range.
+
+Lets also plot HrAvg with the TemperatureCMax which has a strong negative correlation between each other. HrAvg is the average relative humidity in %.
+
+```{r fig.width=10}
+library(ggplot2)
+library(plotly)
+
+# Convert Date column to Date type
+temp_data$Date <- as.Date(temp_data$Date)
+
+# Create the plot
+plot <- ggplot(temp_data, aes(x = Date)) +
+  geom_line(aes(y = TemperatureCMax, color = "TemperatureCMax"), size = 1) +
+  geom_line(aes(y = HrAvg, color = "HrAvg"), size = 1) +
+  scale_color_manual(values = c("TemperatureCMax" = "red", 
+                                 "HrAvg" = "green")) +
+  labs(title = "Time Series Plot of Temperature and Humidity",
+       x = "Date",
+       y = "Temperature (°C)",
+       color = "Variable") +
+  theme_minimal()
+
+# Convert ggplot object to plotly
+plotly_plot <- ggplotly(plot)
+
+# Print the interactive plot
+ggplotly(plotly_plot)
+```
+
+The time series plot illustrates a strong negative correlation between average relative humidity (HrAvg) and maximum temperature (TemperatureCMax), indicating that warmer temperatures coincide with lower humidity levels and vice versa, consistent with meteorological principles. Peaks in temperature align with troughs in humidity, reflecting the inverse relationship between the two variables, where warmer air can hold more moisture. Synchronized fluctuations suggest a dynamic interplay, with higher temperatures leading to greater humidity reductions and vice versa. Temporal patterns reveal trends and seasonal cycles, enhancing understanding of the relationship between temperature and humidity over time.
+
+To understand the relationship between the various variables in the correlation matrix, we can do a few scatter plots:
+
+Scatter Plot between Average Temperature and Average Relative Humidity
+```{r fig.width=10}
+library(plotly)
+
+# Create the scatter plot
+scatter_plot <- plot_ly(temp_data, x = ~TemperatureCAvg, y = ~HrAvg, color = I("red")) %>%
+  add_markers() %>%
+  layout(title = "Scatter Plot: Average Temperature vs. Average Relative Humidity",
+         xaxis = list(title = "Average Temperature (°C)"),
+         yaxis = list(title = "Average Relative Humidity (%)"),
+         showlegend = FALSE)
+
+# Print the interactive scatter plot
+ggplotly(scatter_plot)
+
+```
+We can use the smoothing function to to add a linear regression line to the scatter plot without the confidence intervals. The line will be the best-fitting linear relationship between Average Temperature and Average Humidity:
+```{r fig.width=10}
+library(ggplot2)
+library(plotly)
+
+# Create the ggplot scatter plot with linear regression line
+scatter_plot <- ggplot(temp_data, aes(x = TemperatureCAvg, y = HrAvg)) +
+  geom_point(color = "red") +
+  geom_smooth(method = "lm", se = TRUE) +  # Add linear regression line without confidence interval
+  labs(title = "Scatter Plot: Average Temperature vs. Average Humidity with Linear Regression",
+       x = "Average Temperature (°C)",
+       y = "Average Humidity (%)") +
+  theme_minimal()
+
+# Convert ggplot to interactive plotly plot
+interactive_plot <- ggplotly(scatter_plot)
+
+# Print the interactive plot
+ggplotly(interactive_plot)
+```
+
+The scatter plot and fitted linear regression line suggest a negative correlation between average temperature and average relative humidity, with warmer temperatures associated with lower humidity levels and vice versa. Despite some outliers, the regression line generally fits the data well, indicating a reasonably strong correlation. However, factors like seasonal variations and local weather phenomena may influence the observed pattern, warranting further analysis.
+
+Analyzing the relationship between Average Humidity and Sun Duration in Hours using a scatter plot and then fitting a linear regression model between them:
+```{r fig.width=10}
+# Create scatter plot between HrAvg and SunD1h with linear regression line
+ggplot(temp_data, aes(x = HrAvg, y = SunD1h)) +
+  geom_point(color="red") +
+  geom_smooth(method = "lm", se = TRUE) +  # Add linear regression line without confidence interval
+  labs(title = "Scatter Plot: Average Humidity vs. Sun Duration with Linear Regression",
+       x = "Average Humidity",
+       y = "Sun Duration") +
+  theme_minimal()
+```
+
+The scatter plot and linear regression line between average humidity (HrAvg) and sun duration in hours (SunD1h) reveal a negative correlation, indicating that as humidity increases, sun duration tends to decrease. The regression line fits the data reasonably well, suggesting a strong correlation, consistent with meteorological principles where higher humidity levels often coincide with increased cloud cover, obstructing sunlight. However, factors like seasonal variations and weather patterns may influence this relationship. This analysis underscores the significance of certain variables, like average temperature and sun duration, on each other within the weather dataset, suggesting that investigations into their relationships with other variables in a crime dataset need not consider variables from the weather dataset.
+
+### Insights from the correlation and temporal analysis of weather data:
+
+- We could identify some key variables in the weather dataset like Average Temperature, Dew Point, Sun Duration, Precipitation that show temporal variation and also have significant relation among one another. 
+- We could also analyse the nature of the relation between these variable and understand their interdependence.
+
+## Compiling the Weather Data for Monthly time quantum:
+
+Since the crime data is reported on a monthly time quantum, it is essential for us to reduce the temporal scope of the weather data into a monthly time frame so that we can merge the two datasets and combine them into a single data frame and analyse the crime data in light of the weather data.
+
+```{r fig.width=10}
+library(dplyr)
+library(lubridate)
+
+# Convert Date column to month-year format
+temp_data$MonthYear <- month(temp_data$Date)
+
+# Group by MonthYear and calculate monthly medians
+monthly_data <- temp_data %>%
+  group_by(MonthYear) %>%
+  summarize(
+    TemperatureCAvg = median(TemperatureCAvg),
+    Precmm = median(Precmm),
+    TotClOct = median(TotClOct),
+    SunD1h = median(SunD1h))
+
+crime_df$MonthYear <- as.integer(substr(crime_df$date, 6, 7))
+
+merged_data <- merge(crime_df, monthly_data, by = "MonthYear")
+#merged_data <- merged_data[, -which(names(merged_data) == "month")]
+# View the merged data
+head(merged_data)
+
+```
+In the next step of our analysis, we will investigate the impact of median Monthly Temperature on the Crime Count:
+
+```{r fig.width=10}
+# Aggregate the crime data by month
+crime_count <- merged_data %>%
+  group_by(TemperatureCAvg) %>%
+  summarise(crime_count = n())
+str(crime_count)
+# Create scatter plot between HrAvg and SunD1h with linear regression line
+ggplot(crime_count, aes(x = TemperatureCAvg, y = crime_count)) +
+  geom_point(color="red") +
+  geom_smooth(method = "lm", se = TRUE) +  # Add linear regression line without confidence interval
+  labs(title = "Scatter Plot: Temperature vs. Crime Count with Linear Regression",
+       x = "Monthly Temperature",
+       y = "Crime Count") +
+  theme_minimal()
+```
+
+The scatter plot and fitted linear regression line between median monthly temperature (TemperatureCAvg) and crime count reveal a positive correlation, indicating that as temperature increases, so does the crime count, and vice versa. Despite some outliers, the regression line generally fits the data well, suggesting a reasonably strong correlation, although the smaller dataset size may impact robustness. Factors like socioeconomic conditions and law enforcement policies may influence this relationship, warranting further analysis to enhance understanding.
+
+In the next step of our analysis, we will investigate the impact of median Monthly Precipitation on the Crime Count:
+
+```{r fig.width=10}
+# Aggregate the crime data by month
+crime_count <- merged_data %>%
+  group_by(Precmm) %>%
+  summarise(crime_count = n())
+str(crime_count)
+# Create scatter plot between HrAvg and SunD1h with linear regression line
+ggplot(crime_count, aes(x = Precmm, y = crime_count)) +
+  geom_point(color="red") +
+  geom_smooth(method = "lm", se = TRUE) +  # Add linear regression line without confidence interval
+  labs(title = "Scatter Plot: Precmm vs. Crime Count with Linear Regression",
+       x = "Precmm",
+       y = "Crime Count") +
+  theme_minimal()
+```
+
+
+The scatter plot and fitted linear regression line between median monthly precipitation (Precmm) and crime count suggest a negative correlation, indicating that as precipitation increases, crime count tends to decrease, and vice versa. Despite having only three data points plotted, the regression line fits the data reasonably well, suggesting a strong correlation based on the limited data available. However, caution is warranted due to the small sample size, which may impact the reliability of conclusions drawn. Factors like seasonal variations and socioeconomic conditions may influence this relationship, necessitating further analysis with additional data and variables to better understand the dynamics between precipitation and crime count.
+
+In the next step of our analysis, we will investigate the impact of median Monthly Sun Duration on the Crime Count:
+
+```{r fig.width=10}
+# Aggregate the crime data by month
+crime_count <- merged_data %>%
+  group_by(SunD1h) %>%
+  summarise(crime_count = n())
+str(crime_count)
+# Create scatter plot between HrAvg and SunD1h with linear regression line
+ggplot(crime_count, aes(x = SunD1h, y = crime_count)) +
+  geom_point(color="red") +
+  geom_smooth(method = "lm", se = TRUE) +  # Add linear regression line without confidence interval
+  labs(title = "Scatter Plot: SunD1h vs. Crime Count with Linear Regression",
+       x = "SunD1h",
+       y = "Crime Count") +
+  theme_minimal()
+```
+
+The analysis indicates a negative correlation between median monthly sun duration (SunD1h) and crime count, with longer sun durations associated with lower crime counts. However, the moderate fit of the regression line and the presence of outliers suggest potential variability and other influencing factors. With limited data available, caution is needed in generalizing these findings. Further research incorporating additional data and considering other factors is necessary to better understand the relationship between sun duration and crime count.
+
+# Conclusion
+
+In our thorough examination of crime statistics in Colchester, we set out to reveal the complex factors that influence the city's crime trends. By engaging in thorough data preparation, cleaning, and exploration, we thoroughly examined the temporal, spatial, and environmental aspects of crime incidents. This trip gave important understanding of the patterns and trends in criminal activities, as well as the various factors that influence them.
+
+One of the main discoveries from our study was the intricate relationship among different factors impacting the frequency of crime. Moreover, our investigation revealed fluctuations in crime patterns throughout the year, emphasizing the influence of weather on criminal activities. These observations highlight the intricate aspects of crime patterns and stress the necessity of taking various factors into account to comprehend and combat criminal behaviors.
+
+Geospatial analysis was essential in offering a spatial view of crime occurrences in Colchester. By pinpointing clusters of crime incidents in various locations, we were able to identify areas with high concentrations of crime. This knowledge of space provided law enforcement with useful information to improve focused policing and create better crime prevention methods. Furthermore, our examination of outlier street IDs offered important perspectives on how crime is spread across the city, highlighting the importance of targeted interventions and involving the community.
+
+Furthermore, significant relationships between crime counts and weather variables were revealed through correlation and regression analyses. We showed how temperature, rainfall, and other environmental factors can be used to predict criminal behavior using statistical modeling. This ability to predict not only improves our grasp of crime trends but also provides useful information for law enforcement and policymakers to develop proactive strategies against crime.
+
+Looking ahead, it will be essential to maintain cooperation among data scientists, law enforcement agencies, and community stakeholders to create safer and more secure communities. Through utilizing the combined knowledge and assets, we can work towards a future in which insights based on data lead to a society that is more resilient and fair. This report demonstrates how data analytics has the power to address difficult social issues and create positive change. By conducting thorough analysis and making informed decisions, we can strive to create safer and more vibrant communities for future generations.
+
+# Citations
+
+- Corcoran, J., Zahnow, R. (2022). Weather and crime: a systematic review of the empirical literature. Crime Science, 11(16). https://doi.org/10.1186/s40163-022-00179-8
+- Cohn, E. G. (1990). Weather and crime. The British Journal of Criminology, 30(1), 51–64. https://doi.org/10.1093/oxfordjournals.bjc.a047980
+- Chainey, S., Tompson, L., & Uhlig, S. (2008). The utility of hotspot mapping for predicting spatial patterns of crime. Security Journal, 21(1-2), 4-28. https://doi.org/10.1057/palgrave.sj.8350060
+- Ratcliffe, J. H. (2004). The hotspot matrix: A framework for the spatio-temporal targeting of crime reduction. Police Practice and Research, 5(1), 5-23. https://doi.org/10.1080/1561426042000194984
+- Rotton, J., & Cohn, E. G. (2003). Outdoor temperature, climate control, and criminal assault: The spatial and temporal ecology of violence. Environment and Behavior, 35(5), 564-586. https://doi.org/10.1177/0013916503035005001
+- Mohler, G., Short, M. B., Brantingham, P. J., Schoenberg, F. P., & Tita, G. E. (2011). Self-exciting point process modeling of crime. Journal of the American Statistical Association, 106(493), 100-108. https://doi.org/10.1198/jasa.2011.ap09546
+- Cordner, G. W. (2014). Community policing: Elements and effects. Police Quarterly, 17(1), 3-30. https://doi.org/10.1177/1098611113513805
+
+
+
+
+
+
+
